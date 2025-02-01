@@ -85,24 +85,24 @@ class MultiHeadedAttention(nn.Module):
         #define causal mask for product 
 
         if mask is not None:
-           prod.masked_fill(mask.unsqueeze(1),-1e8)
+           prod=prod.masked_fill(mask[:,:,:T,:T],-1e8)
 
 
 
         if ALIBI==True:
          
-         bias=self.linear_bias*torch.arange(prod.size()[-1]).float().unsqueeze(0)
+         slope=torch(0.2)
+         
+         bias=self.linear_bias*slope*torch.arange(prod.size()[-1]).float().unsqueeze(0)
 
          prod+=bias 
+        
 
 
-         attention_weights=F.softmax(prod)
-         attention_weights=self.dropout(attention_weights)
-         attention_output=torch.matmul(attention_weights,V)
-        else:
-         attention_weights=F.softmax(prod)
-         attention_output=torch.matmul(attention_weights,V)
 
+        attention_weights=F.softmax(prod)
+        attention_weights=self.dropout(attention_weights)
+        attention_output=torch.matmul(attention_weights,V)
         #define causal mask for attention 
 
 
@@ -177,7 +177,7 @@ class DecoderLayer(nn.Module):
 
         if enc_output is not None:
             tmp2=self.enc_dec_attention_norm(tmp)
-            tmp3=self.enc_dec_attention(enc_output,ALIBI,decmask,scalarproduct,tmp2)
+            tmp3=self.enc_dec_attention(enc_output,False,decmask,scalarproduct,tmp2)
 
 
         out=self.network_norm(tmp3)
