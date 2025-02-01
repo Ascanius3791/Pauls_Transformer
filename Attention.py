@@ -84,8 +84,10 @@ class MultiHeadedAttention(nn.Module):
 
         #define causal mask for product 
 
+        #casual mask 
+
         if mask is not None:
-           prod=prod.masked_fill(mask[:,:,:T,:T],-1e8)
+           prod=prod.masked_fill(mask[:,:T,:T],-1e8)
 
 
 
@@ -103,7 +105,8 @@ class MultiHeadedAttention(nn.Module):
         attention_weights=F.softmax(prod)
         attention_weights=self.dropout(attention_weights)
         attention_output=torch.matmul(attention_weights,V)
-        #define causal mask for attention 
+     
+        #define output 
 
 
         outputs=self.wo(attention_output)
