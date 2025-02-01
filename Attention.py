@@ -1,4 +1,4 @@
-# in this pythonf file the attention layer is implemeted
+# in this python file the attention layer is implemeted
 import torch 
 import torch.nn as nn
 from torch.nn import functional as F
