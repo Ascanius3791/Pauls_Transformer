@@ -66,11 +66,12 @@ class MultiHeadedAttention(nn.Module):
         sub_token=int(sub_token)#change float to int
         #print('sub_token',sub_token)
         #print('Q',Q.size())
-        print('Q.shape',Q.shape)
-        Q=Q.reshape(B,T,self.nheads,sub_token).permute(0,2,1,3).reshape(B*self.nheads,T,sub_token)#changed C to sub token, such dat the dimensions line up for reshape
-        K=K.reshape(B,T,self.nheads,sub_token).permute(0,2,1,3).reshape(B*self.nheads,T,sub_token)
-        V=V.reshape(B,T,self.nheads,sub_token).permute(0,2,1,3).reshape(B*self.nheads,T,sub_token)
-        print("Shape of Q",Q.size())
+        #print("X.size",x.size())
+        #print('Q.shape',Q.shape)
+        #Q=Q.reshape(B,T,self.nheads,sub_token).permute(0,2,3,1)#changed C to sub token, such dat the dimensions line up for reshape
+        #K=K.reshape(B,T,self.nheads,sub_token).permute(0,2,3,1)
+        #V=V.reshape(B,T,self.nheads,sub_token).permute(0,2,3,1)
+        #print("Shape of Q",Q.size())
         #print("Attention matrices are defined")
 
         #define attention weights 
@@ -88,8 +89,17 @@ class MultiHeadedAttention(nn.Module):
         #casual mask 
 
         if mask is not None:
-           prod=prod.masked_fill(mask[:,:T,:T],float('-inf'))
-
+            mask = torch.tril(torch.ones(T, T))
+            mask = mask.to(device=x.device, dtype=x.dtype)
+           
+            #print('prod',prod.size())
+            #print("mask = " , mask.size())
+             
+            prod=prod.masked_fill(mask == 0,float('-inf'))
+            #print('prod[0]', prod[0])
+            #print("softmax",F.softmax(prod,2))
+            #input("prod after mask")
+        
 
 
         if ALIBI==True:
@@ -99,18 +109,23 @@ class MultiHeadedAttention(nn.Module):
             bias=self.linear_bias*slope*torch.arange(prod.size()[-1]).float().unsqueeze(0)
 
             prod+=bias 
+            #print("bias.shape",bias.shape)
         
 
+        #print('prod[0]', prod[0])        
+        attention_weights=F.softmax(prod,2)
+        #print('attention_weights',attention_weights.size())
+        #print('attention_weights[0]',attention_weights[0])
+        #input("attention_weights")
         
-        attention_weights=F.softmax(prod)
         
         attention_weights=self.dropout(attention_weights)
         
         attention_output=torch.matmul(attention_weights,V)
-        print("nhidden",self.nhidden)
+        #print("nhidden",self.nhidden)
         #define output 
-        print('attention_output',attention_output.size())
-        print("attention. output",attention_output.shape)
+        #print('attention_output',attention_output.size())
+        #print("attention. output",attention_output.shape)
         
         outputs=self.wo(attention_output)
 
@@ -126,10 +141,10 @@ class EncoderLayer(nn.Module):
         #define attention norm 
 
         self.attention_norm=nn.LayerNorm(nhidden,eps=1e-6)
-        print('nhaeds',nheads)
-        print("begin attention")
+        #print('nhaeds',nheads)
+        #print("begin attention")
         self.attention=MultiHeadedAttention(nhidden,nheads,dropout_rate)
-        print("end attention")
+        #print("end attention")
 
         self.attention_dropout=nn.Dropout(dropout_rate)
 
@@ -201,7 +216,7 @@ class Encoder(nn.Module):
          super(Encoder,self).__init__()
 
          # define array of encoder layers 
-         print('nheads_Enc',nheads)
+        # print('nheads_Enc',nheads)
 
          encoders=[EncoderLayer(nhidden,inpsize,nheads,dropout_rate) for _ in range(nlayers)]
 
@@ -226,7 +241,7 @@ class Decoder(nn.Module):
             super(Decoder,self).__init__()#change Dencoder to Decoder
 
             # define array of encoder layers 
-            print('nheadsDec',nheads)
+            #print('nheadsDec',nheads)
             decoders=[DecoderLayer(nhidden,inpsize,nheads,dropout_rate) for _ in range(nlayers)]
 
             self.layers=nn.ModuleList(decoders)

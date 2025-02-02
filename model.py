@@ -11,7 +11,7 @@ class BigramModel(nn.Module):
         if embed_size is None:
             embed_size = vocab_size
         #print("Embeding size: ", embed_size)
-        print("Nheads: ", nheads)
+        #print("Nheads: ", nheads)
         self.embedding_table = nn.Embedding(vocab_size, embed_size)
         self.encoder = Encoder(nhidden ,nheads ,nlayers,embed_size ,dropout_rate)
         self.decoder = Decoder(nhidden ,nheads ,nlayers,embed_size ,dropout_rate)
@@ -21,12 +21,11 @@ class BigramModel(nn.Module):
     def forward(self, idx, targets = None):#if targets are provided, loss is calculated, else loss is None
         
         inputs = self.embedding_table(idx)
-        #print("inpur shape: " ,inputs.shape)
-        print("beginn encoder")
+        
         enc_output = self.encoder(inputs)
-        print("enc_output shape: ", enc_output.shape)
+        
         dec_output = self.decoder(inputs,enc_output)
-        print("dec_output shape: ", dec_output.shape)
+        
         logits = self.output_layer(dec_output)
         if targets is not None:
             target_inputs = self.embedding_table(targets)
@@ -56,15 +55,13 @@ class BigramModel(nn.Module):
     
 
 m = BigramModel(vocab_size,9,3,vocab_size,vocab_size)
-from trainer import x,y
-logits, loss = m(x,)
-input("Press Enter to continue...")
-print(logits.shape)
+#from trainer import x,y
+#logits, loss = m(x,)
+#input("Press Enter to continue...")
+#print(logits.shape)
 
 
-print(loss)
-generated = m.generate(idx = torch.zeros((1, 1), dtype=torch.long), max_new_tokens=100)
-print(generated.shape)
-print(decode(generated[0].tolist()))
+#print(loss)
+
 
     
