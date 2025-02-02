@@ -104,12 +104,14 @@ class MultiHeadedAttention(nn.Module):
 
         if ALIBI==True:
          
-            slope=torch(0.2)
+            slope=torch.Tensor([2**(-8*(i+1)/self.nheads) for i in range(self.nheads)],dtype=int).unsqueeze(1).unsqueeze(1).unsqueeze(0)
+
+
          
-            bias=self.linear_bias*slope*torch.arange(prod.size()[-1]).float().unsqueeze(0)
+            bias=slope*torch.arange(-prod.size()[-1]+1,1,1).float().unsqueeze(0).unsqueeze(0).unsqueeze(2)
 
             prod+=bias 
-            #print("bias.shape",bias.shape)
+            print("bias.shape",bias.shape)
         
 
         #print('prod[0]', prod[0])        
