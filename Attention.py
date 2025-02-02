@@ -103,6 +103,8 @@ class MultiHeadedAttention(nn.Module):
 
 
         if ALIBI==True:
+
+            # get right slope 
          
             slope=torch.Tensor([2**(-8*(i+1)/self.nheads) for i in range(self.nheads)],dtype=int).unsqueeze(1).unsqueeze(1).unsqueeze(0)
 
