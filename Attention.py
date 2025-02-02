@@ -61,10 +61,17 @@ class MultiHeadedAttention(nn.Module):
         V=self.value(x)
 
         sub_token=C/self.nheads
-
-        Q=Q.reshape(B,T,self.nheads,C).permute(0,2,1,3).reshape(B*self.nheads,T,sub_token)
-        K=K.reshape(B,T,self.nheads,C).permute(0,2,1,3).reshape(B*self.nheads,T,sub_token)
-        V=V.reshape(B,T,self.nheads,C).permute(0,2,1,3).reshape(B*self.nheads,T,sub_token)
+        if sub_token!=int(sub_token):
+            raise ValueError('sub_token must be integer')
+        sub_token=int(sub_token)#change float to int
+        #print('sub_token',sub_token)
+        #print('Q',Q.size())
+        print('Q.shape',Q.shape)
+        Q=Q.reshape(B,T,self.nheads,sub_token).permute(0,2,1,3).reshape(B*self.nheads,T,sub_token)#changed C to sub token, such dat the dimensions line up for reshape
+        K=K.reshape(B,T,self.nheads,sub_token).permute(0,2,1,3).reshape(B*self.nheads,T,sub_token)
+        V=V.reshape(B,T,self.nheads,sub_token).permute(0,2,1,3).reshape(B*self.nheads,T,sub_token)
+        print("Shape of Q",Q.size())
+        #print("Attention matrices are defined")
 
         #define attention weights 
 
@@ -94,15 +101,17 @@ class MultiHeadedAttention(nn.Module):
             prod+=bias 
         
 
-
-
+        
         attention_weights=F.softmax(prod)
+        
         attention_weights=self.dropout(attention_weights)
+        
         attention_output=torch.matmul(attention_weights,V)
-     
+        print("nhidden",self.nhidden)
         #define output 
-
-
+        print('attention_output',attention_output.size())
+        print("attention. output",attention_output.shape)
+        
         outputs=self.wo(attention_output)
 
         
@@ -118,7 +127,9 @@ class EncoderLayer(nn.Module):
 
         self.attention_norm=nn.LayerNorm(nhidden,eps=1e-6)
         print('nhaeds',nheads)
+        print("begin attention")
         self.attention=MultiHeadedAttention(nhidden,nheads,dropout_rate)
+        print("end attention")
 
         self.attention_dropout=nn.Dropout(dropout_rate)
 
@@ -128,8 +139,11 @@ class EncoderLayer(nn.Module):
     # define forward function of encoder layer 
 
     def forward(self,x,ALIBI=False,mask=None,scalarproduct='standard'):
-        print('x',x.size())
+        #print('x_encoder_layer',x.size())
+        #print('x_encoder_layer',x.shape)
         y=self.attention_norm(x)
+        #print('y_encoder_layer',y.size())
+        #print('y_encoder_layer',y.shape)
         y=self.attention(y,ALIBI,mask,scalarproduct)
         y=self.attention_dropout(y)
 

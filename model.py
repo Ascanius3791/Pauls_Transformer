@@ -22,8 +22,11 @@ class BigramModel(nn.Module):
         
         inputs = self.embedding_table(idx)
         #print("inpur shape: " ,inputs.shape)
+        print("beginn encoder")
         enc_output = self.encoder(inputs)
+        print("enc_output shape: ", enc_output.shape)
         dec_output = self.decoder(inputs,enc_output)
+        print("dec_output shape: ", dec_output.shape)
         logits = self.output_layer(dec_output)
         if targets is not None:
             target_inputs = self.embedding_table(targets)
@@ -52,7 +55,7 @@ class BigramModel(nn.Module):
         return idx
     
 
-m = BigramModel(vocab_size,8,3,vocab_size)
+m = BigramModel(vocab_size,9,3,vocab_size,vocab_size)
 from trainer import x,y
 logits, loss = m(x,)
 input("Press Enter to continue...")
