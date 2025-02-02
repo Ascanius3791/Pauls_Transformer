@@ -13,7 +13,7 @@ with open(base_data, "r") as file:
 
 vocab = sorted(list(set(text)))
 vocab_size = len(vocab)
-#print("Vocabulary size:", vocab_size)
+print("Vocabulary size:", vocab_size)
 print(vocab)
 
 

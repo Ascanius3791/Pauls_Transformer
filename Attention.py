@@ -35,13 +35,7 @@ class FeedForward(nn.Module):
         bias2=self.Layer2.bias 
 
         return weights1,weights2,bias1,bias2
-
-
-     
-
    
-
-
 class MultiHeadedAttention(nn.Module):
     # define constructor were query and weights are initialized 
     def __init__ (self,nhidden,nheads=10,dropout_rate=0.0):
@@ -87,17 +81,17 @@ class MultiHeadedAttention(nn.Module):
         #casual mask 
 
         if mask is not None:
-           prod=prod.masked_fill(mask[:,:T,:T],-1e8)
+           prod=prod.masked_fill(mask[:,:T,:T],float('-inf'))
 
 
 
         if ALIBI==True:
          
-         slope=torch(0.2)
+            slope=torch(0.2)
          
-         bias=self.linear_bias*slope*torch.arange(prod.size()[-1]).float().unsqueeze(0)
+            bias=self.linear_bias*slope*torch.arange(prod.size()[-1]).float().unsqueeze(0)
 
-         prod+=bias 
+            prod+=bias 
         
 
 
@@ -115,8 +109,6 @@ class MultiHeadedAttention(nn.Module):
            
         return outputs 
 
-
-
 # define one layer of encoding with attention layer+ feed forward neural network 
 class EncoderLayer(nn.Module):
     def __init__(self,nhidden,inpsize,nheads=10,dropout_rate=0.0):
@@ -125,7 +117,7 @@ class EncoderLayer(nn.Module):
         #define attention norm 
 
         self.attention_norm=nn.LayerNorm(nhidden,eps=1e-6)
-
+        print('nhaeds',nheads)
         self.attention=MultiHeadedAttention(nhidden,nheads,dropout_rate)
 
         self.attention_dropout=nn.Dropout(dropout_rate)
@@ -136,6 +128,7 @@ class EncoderLayer(nn.Module):
     # define forward function of encoder layer 
 
     def forward(self,x,ALIBI=False,mask=None,scalarproduct='standard'):
+        print('x',x.size())
         y=self.attention_norm(x)
         y=self.attention(y,ALIBI,mask,scalarproduct)
         y=self.attention_dropout(y)
@@ -147,13 +140,11 @@ class EncoderLayer(nn.Module):
 
         return y
    
-
-
 #define one lyer of Decoding 
 
 class DecoderLayer(nn.Module):
      def __init__(self,nhidden,inpsize,nheads=10,dropout_rate=0.0):
-        super(EncoderLayer,self).__init__()
+        super(DecoderLayer,self).__init__()
 
         #define attention norm 
 
@@ -189,16 +180,16 @@ class DecoderLayer(nn.Module):
 
         return out 
    
-
 #define encoder and decoder classes 
 
 class Encoder(nn.Module):
-    def __init__(self,nhidden,nheads,nlayers,dropout_rate=0.0):
+    def __init__(self,nhidden,nheads,nlayers,inpsize,dropout_rate=0.0):
          super(Encoder,self).__init__()
 
          # define array of encoder layers 
+         print('nheads_Enc',nheads)
 
-         encoders=[EncoderLayer(nhidden,nheads,dropout_rate) for _ in range(nlayers)]
+         encoders=[EncoderLayer(nhidden,inpsize,nheads,dropout_rate) for _ in range(nlayers)]
 
          self.layers=nn.ModuleList(encoders)
 
@@ -215,21 +206,20 @@ class Encoder(nn.Module):
         outputs=self.last_norm(outputs)
         return outputs
 
-
 class Decoder(nn.Module):
 
-     def __init__(self,nhidden,nheads,nlayers,dropout_rate=0.0):
-         super(Encoder,self).__init__()
+     def __init__(self,nhidden,nheads,nlayers,inpsize,dropout_rate=0.0):
+            super(Decoder,self).__init__()#change Dencoder to Decoder
 
-         # define array of encoder layers 
+            # define array of encoder layers 
+            print('nheadsDec',nheads)
+            decoders=[DecoderLayer(nhidden,inpsize,nheads,dropout_rate) for _ in range(nlayers)]
 
-         decoders=[DecoderLayer(nhidden,nheads,dropout_rate) for _ in range(nlayers)]
+            self.layers=nn.ModuleList(decoders)
 
-         self.layers=nn.ModuleList(decoders)
+            #output of last layer is normalized 
 
-         #output of last layer is normalized 
-
-         self.last_norm=nn.LayerNorm(nhidden,eps=1e-6)
+            self.last_norm=nn.LayerNorm(nhidden,eps=1e-6)
      
      def forward(self,targets,enc_output,ALIBI=False,mask=None,decmask=None,scalarproduct='standard'):
         outputs=targets
@@ -240,10 +230,4 @@ class Decoder(nn.Module):
         outputs=self.last_norm(outputs)
         return outputs
    
-
-
-
-
-
-
 
