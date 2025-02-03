@@ -24,24 +24,6 @@ def batchify(mode = "training", batch_size  =4):
     ix= torch.randint(len(data)-context_lenght, (batch_size,))
     x = torch.stack([data[i:i+context_lenght] for i in ix])
     y = torch.stack([data[i+1:i+context_lenght+1] for i in ix])
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    x = x.to(device)
-    y = y.to(device)
     return x,y
 
-
-num_loss_avg = 100
-batch_size = 32
-@torch.no_grad()
-def estimate_loss(model):
-    output = {}
-    model.eval()
-    for mode in ["training", "testing"]:
-        losses = torch.zeros(num_loss_avg)
-        for i in range(num_loss_avg):
-            x,y = batchify(mode, batch_size)
-            logits, loss = model(x,y)
-            losses[i] = loss.item()
-        output[mode] = losses.mean()
-    model.train()
-    return output
+x,y = batchify()

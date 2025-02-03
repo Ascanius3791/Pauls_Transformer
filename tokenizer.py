@@ -5,7 +5,7 @@ base_data = "Goethe.txt" # for final run
 with open(base_data, "r") as file:
     char_to_remove = ["*"]
     text = file.read()
-    text = text.lower()
+    #text = text.lower()
     for char in char_to_remove:
         text = text.replace(char, "")
     text = text.replace("  ", " ")
