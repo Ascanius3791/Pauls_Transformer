@@ -5,16 +5,15 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-nhidden = 40#20   #always used 6,3,2
-
-nheads  = 8#5
+nhidden = 8#20   #always used 6,3,2
+nheads  = 4#5
 nlayers = 8
 #batch_size =32 go to trainer.py for changes
-embed_size=200# jakobs tip: 200+
+embed_size=vocab_size# jakobs tip: 200+
 #make sure embed_size is multiple of nheads
 #embed_size = int(embed_size /nheads) * nheads+nheads
 
-dropout_rate=0.0
+dropout_rate=0.1
 
 m = BigramModel(nhidden, nheads, nlayers, vocab_size, embed_size, dropout_rate)
 
@@ -50,24 +49,20 @@ m = m.to(my_device)
 
 def train(model, data, optimizer, epochs,weight=None):
     #current_progress = 0
-    accumulated_loss =0
     for epoch in range(epochs):
         
-        if epoch % 100 == 0:
+        if epoch % 25 == 0:
             save_model(model, "trained_model.pth")
             #current_progress = progress
-            print("\nEpoch: ", epoch)
-            #losses = estimate_loss(model)
-            #print("Training loss: ", losses["training"])
-            #print("Testing loss: ", losses["testing"])
-            print("accumulated average loss :", accumulated_loss/100)
-            accumulated_loss = 0
+            print("Epoch: ", epoch)
+            losses = estimate_loss(model)
+            print("Training loss: ", losses["training"])
+            print("Testing loss: ", losses["testing"])
             context = torch.zeros((1, 1), dtype=torch.long, device=my_device)
             #define alternative context, "Des Pudels Kern"
             context = contextify("des pudels kern ist")
             context = context.to(my_device)
-            print(decode(model.generate(context, max_new_tokens=10,mode="greedy")[0].tolist()))
-            print()
+            print(decode(model.generate(context, max_new_tokens=50,mode="greedy")[0].tolist()))
         xb, yb = batchify("training", batch_size=batch_size)
         xb = xb.to(my_device)
         logits, loss = model(xb, yb,weight=weight)
@@ -87,14 +82,22 @@ def train(model, data, optimizer, epochs,weight=None):
             print("Predictions: ")
             likelihoods = F.softmax(temp_logits[0], dim=-1)
             for i, p in enumerate(likelihoods):
-                if(p.item() > 0.01):
+                if(p.item() > 0.001):
                     print(decode([i]), ":", p.item())
             print("Loss of this batch: ", temp_loss.item())
-            print()
+            
+        '''
+        print("\nTraining Step: ", epoch)
+        print("xb[0] : ", xb[0])
+        print("yb[0] : ", yb[0])
+        #print("Logits shape: ", logits.shape)
+        print("Logits[0]: ", logits[0])
+        print("Loss: ", loss)
+        input("Loss calculated\n")
+        '''
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
-        accumulated_loss += loss.item()
     return model
 
 trained_model = train(m, training_data, optimizer, training_iterations,weight=weight)

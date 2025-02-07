@@ -55,8 +55,6 @@ class BigramModel(nn.Module):
             #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             
             #print("Logits shape: ", logits.shape)
-            #print("Targets shape: ", targets.shape)
-            
            # print("logits[0][-1]: ", logits[0][-1])
             logits = logits.view(B*T, C)
             targets = targets.view(B*T)
@@ -71,6 +69,8 @@ class BigramModel(nn.Module):
         return logits, loss
     
     def generate(self, idx, max_new_tokens,mode="multinomial"):
+        print("Max_new_tokens: ", max_new_tokens)
+        print("Mode: ", mode)   
         for _ in range(max_new_tokens):
             idx_cond = idx[:, -context_lenght:]
                        
@@ -83,10 +83,21 @@ class BigramModel(nn.Module):
             #print("logits: ", logits)
             likelyhoods = F.softmax(logits, dim = -1)
             next_token = 0
-            if mode == "multinomial":
+            if mode == "random":
+                
+                candidates = torch.nonzero(likelyhoods >= 0.3).squeeze()
+                if len(candidates) == 0:
+                    candidates = torch.arange(len(likelyhoods))
+                next_token = candidates[torch.randint(0, len(candidates), (1,))]
+                next_token = candidates[torch.randint(0, len(candidates), (1,))]
+                print("next_token: ", next_token.item())
+                
+            elif mode == "multinomial":
                 next_token = torch.multinomial(likelyhoods, num_samples = 1)
             elif mode == "hypernomial":
-                likelyhoods = likelyhoods.log()
+                likelyhoods = likelyhoods*10
+                likelyhoods = likelyhoods.softmax(dim=-1)
+                
                 likelyhoods = likelyhoods/likelyhoods.sum()
                 next_token = torch.multinomial(likelyhoods, num_samples = 1)
             elif mode == "greedy":

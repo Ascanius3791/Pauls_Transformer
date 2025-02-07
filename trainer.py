@@ -6,7 +6,7 @@ n= int(0.9*len(data))
 training_data = data[:n]
 testing_data = data[n:]
 
-context_lenght = 80#16#was 10 for long training
+context_lenght = 16#16#was 10 for long training
 
 #x = training_data[:context_lenght]
 #y = training_data[1:context_lenght+1]
@@ -39,7 +39,7 @@ def contextify(message):
 
 
 num_loss_avg = 10*2
-batch_size = 50
+batch_size = 200
 @torch.no_grad()
 def estimate_loss(model):
     output = {}

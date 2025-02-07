@@ -40,13 +40,13 @@ def generator(model, use_data = None,mode = "greedy",max_new_tokens=50):
                 input_string = input("Enter Context: ")
             context = contextify(input_string).to(my_device)
             print("Result:")
-            print(decode(model.generate(context, max_new_tokens=max_new_tokens,mode="greedy")[0].tolist()))
+            print(decode(model.generate(context, max_new_tokens=max_new_tokens,mode=mode)[0].tolist()))
         else:
             print("Context:")
             print(decode(context[0].tolist()))
             print("Result:")
-            print(decode(model.generate(context, max_new_tokens=max_new_tokens,mode="greedy")[0].tolist()))
+            print(decode(model.generate(context, max_new_tokens=max_new_tokens,mode=mode)[0].tolist()))
 
-generator(m, None,mode = "hypernomial",max_new_tokens=500)
+generator(m, None,mode = "greedy",max_new_tokens=50)
 
 #parmaeters
