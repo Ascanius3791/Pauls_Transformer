@@ -9,10 +9,10 @@ class FeedForward(nn.Module):
     def __init__(self,nhidden,inpsize,dropout_rate=0.0):
         super(FeedForward,self).__init__()
         # create two layers of the feed forward neural network used in the encoder 
-        self.Layer1=nn.Linear(nhidden,inpsize)
+        self.Layer1=nn.Linear(nhidden,4*inpsize)#4 is arnes tip
         #use ReLU as activation function
         self.relu=nn.ReLU()
-        self.Layer2=nn.Linear(inpsize,nhidden)
+        self.Layer2=nn.Linear(4*inpsize,nhidden)
 
         self.dropout=nn.Dropout(dropout_rate)
    
@@ -45,9 +45,10 @@ class MultiHeadedAttention(nn.Module):
         self.query=nn.Linear(nhidden,nhidden,bias=False)
         self.key=nn.Linear(nhidden,nhidden,bias=False)
         self.value=nn.Linear(nhidden,nhidden,bias=False)
-        self.wo=nn.Linear(nhidden,nhidden,bias=False)
+        self.wo=nn.Linear(int(nhidden/nheads),nhidden,bias=False)
         self.linear_bias = nn.Parameter(torch.arange(0, nheads).float().unsqueeze(1))
         self.dropout=nn.Dropout(dropout_rate)
+        #self.MHA=nn.MultiheadAttention(nhidden,nheads,dropout_rate,bb)
 
         # initialize weights 
      # x has form xbatch, size, token
@@ -59,12 +60,17 @@ class MultiHeadedAttention(nn.Module):
 
         K=self.key(x)
         V=self.value(x)
-
+        
         sub_token=C/self.nheads
-
-        Q=Q.reshape(B,T,self.nheads,C).permute(0,2,1,3).reshape(B*self.nheads,T,sub_token)
-        K=K.reshape(B,T,self.nheads,C).permute(0,2,1,3).reshape(B*self.nheads,T,sub_token)
-        V=V.reshape(B,T,self.nheads,C).permute(0,2,1,3).reshape(B*self.nheads,T,sub_token)
+        if sub_token!=int(sub_token):
+            raise ValueError('sub_token must be integer')
+        sub_token=int(sub_token)#change float to int
+        #print('sub_token',sub_token)
+        
+        Q=Q.reshape(B,T,self.nheads,sub_token).permute(0,2,1,3)#changed C to sub token, such dat the dimensions line up for reshape
+        K=K.reshape(B,T,self.nheads,sub_token).permute(0,2,1,3)
+        V=V.reshape(B,T,self.nheads,sub_token).permute(0,2,1,3)
+        
 
         #define attention weights 
 
@@ -75,50 +81,59 @@ class MultiHeadedAttention(nn.Module):
         dk=Q.size()[-1] #last dimension 
 
         prod=torch.matmul(Q,K.transpose(-2,-1))/torch.math.sqrt(dk)
+        #print('prod',prod.size())
+        #input('prod')
 
         #define causal mask for product 
 
         #casual mask 
 
-        if mask is not None:
-           prod=prod.masked_fill(mask[:,:T,:T],float('-inf'))
-
+        
+        
 
 
         if ALIBI==True:
-         
-            slope=torch(0.2)
-         
-            bias=self.linear_bias*slope*torch.arange(prod.size()[-1]).float().unsqueeze(0)
-
-            prod+=bias 
+            offset = [[[[(i-j)*2**(-8*float(h+1)/self.nheads) for i in range(T)] for j in range(T)] for h in range(self.nheads)]for _ in range(B)]
+            offset=torch.tensor(offset,dtype=torch.float)
+            offset=offset.to(device=x.device, dtype=x.dtype)
+            prod+=offset
+            
+        if mask is not None:
+            mask = torch.tril(torch.ones(T, T))
+            mask = mask.to(device=x.device, dtype=x.dtype)
+             
+            prod=prod.masked_fill(mask == 0,float('-inf'))
+        else:
+            raise ValueError('mask must be provided')        
+        attention_weights=F.softmax(prod,2)
         
-
-
-
-        attention_weights=F.softmax(prod)
+        
+        
         attention_weights=self.dropout(attention_weights)
+        
         attention_output=torch.matmul(attention_weights,V)
-     
-        #define output 
-
-
+    
+        #print('attention_output',attention_output.size())
         outputs=self.wo(attention_output)
+        outputs=outputs.sum(1)
+        #print('outputs',outputs.size())
+        #input('outputs')
+        x=x+outputs
 
         
            
-        return outputs 
+        return x 
 
-# define one layer of encoding with attention layer+ feed forward neural network 
-class EncoderLayer(nn.Module):
+class Block(nn.Module):
     def __init__(self,nhidden,inpsize,nheads=10,dropout_rate=0.0):
-        super(EncoderLayer,self).__init__()
+        super(Block,self).__init__()
 
         #define attention norm 
 
         self.attention_norm=nn.LayerNorm(nhidden,eps=1e-6)
-        print('nhaeds',nheads)
+        
         self.attention=MultiHeadedAttention(nhidden,nheads,dropout_rate)
+        
 
         self.attention_dropout=nn.Dropout(dropout_rate)
 
@@ -128,8 +143,43 @@ class EncoderLayer(nn.Module):
     # define forward function of encoder layer 
 
     def forward(self,x,ALIBI=False,mask=None,scalarproduct='standard'):
-        print('x',x.size())
+        
         y=self.attention_norm(x)
+        
+        y=self.attention(y,ALIBI,mask,scalarproduct)
+        y=x+self.attention_dropout(y)
+
+        
+
+        z=self.network_norm(y)
+        z=y+self.network(z)
+
+        return z
+
+
+# define one layer of encoding with attention layer+ feed forward neural network 
+class EncoderLayer(nn.Module):
+    def __init__(self,nhidden,inpsize,nheads=10,dropout_rate=0.0):
+        super(EncoderLayer,self).__init__()
+
+        #define attention norm 
+
+        self.attention_norm=nn.LayerNorm(nhidden,eps=1e-6)
+        
+        self.attention=MultiHeadedAttention(nhidden,nheads,dropout_rate)
+        
+
+        self.attention_dropout=nn.Dropout(dropout_rate)
+
+        self.network_norm=nn.LayerNorm(nhidden,eps=1e-6)
+        self.network=FeedForward(nhidden,inpsize,dropout_rate)
+    
+    # define forward function of encoder layer 
+
+    def forward(self,x,ALIBI=False,mask=None,scalarproduct='standard'):
+        
+        y=self.attention_norm(x)
+        
         y=self.attention(y,ALIBI,mask,scalarproduct)
         y=self.attention_dropout(y)
 
@@ -162,6 +212,7 @@ class DecoderLayer(nn.Module):
     # define forward function of encoder layer 
 
      def forward(self,x,enc_output,ALIBI=False,mask=None,decmask=None,scalarproduct='standard'):
+        
         tmp=self.attention_norm(x)
         # this is the decoder attention output 
         tmp=self.attention(tmp,ALIBI,mask,scalarproduct)
@@ -171,7 +222,7 @@ class DecoderLayer(nn.Module):
 
         if enc_output is not None:
             tmp2=self.enc_dec_attention_norm(tmp)
-            tmp3=self.enc_dec_attention(enc_output,False,decmask,scalarproduct,tmp2)
+            tmp3=self.enc_dec_attention(enc_output,ALIBI,mask,scalarproduct,tmp2)
 
 
         out=self.network_norm(tmp3)
@@ -187,7 +238,7 @@ class Encoder(nn.Module):
          super(Encoder,self).__init__()
 
          # define array of encoder layers 
-         print('nheads_Enc',nheads)
+        # print('nheads_Enc',nheads)
 
          encoders=[EncoderLayer(nhidden,inpsize,nheads,dropout_rate) for _ in range(nlayers)]
 
@@ -196,9 +247,12 @@ class Encoder(nn.Module):
          #output of last layer is normalized 
 
          self.last_norm=nn.LayerNorm(nhidden,eps=1e-6)
+         self.shape_matcher=nn.Linear(inpsize,nhidden)
     
     def forward(self,inputs,ALIBI=False,mask=None,scalarproduct='standard'):
-        outputs=inputs
+        
+        outputs=self.shape_matcher(inputs)
+        
 
         for layer in self.layers:
             outputs=layer(outputs,ALIBI,mask,scalarproduct)
@@ -212,7 +266,7 @@ class Decoder(nn.Module):
             super(Decoder,self).__init__()#change Dencoder to Decoder
 
             # define array of encoder layers 
-            print('nheadsDec',nheads)
+            #print('nheadsDec',nheads)
             decoders=[DecoderLayer(nhidden,inpsize,nheads,dropout_rate) for _ in range(nlayers)]
 
             self.layers=nn.ModuleList(decoders)
@@ -220,14 +274,42 @@ class Decoder(nn.Module):
             #output of last layer is normalized 
 
             self.last_norm=nn.LayerNorm(nhidden,eps=1e-6)
+            self.shape_matcher=nn.Linear(inpsize,nhidden)
      
      def forward(self,targets,enc_output,ALIBI=False,mask=None,decmask=None,scalarproduct='standard'):
-        outputs=targets
+        outputs=self.shape_matcher(targets)
 
         for _, dec_layer in enumerate(self.layers):
-            outputs=dec_layer(outputs,enc_output,ALIBI,decmask,scalarproduct)
+            outputs=dec_layer(outputs,enc_output,ALIBI,mask,scalarproduct)
         
         outputs=self.last_norm(outputs)
         return outputs
-   
+
+class Transformer(nn.Module):
+    def __init__(self,nhidden,nheads,nlayers,inpsize,dropout_rate=0.0):
+         super(Transformer,self).__init__()
+
+         # define array of encoder layers 
+        # print('nheads_Enc',nheads)
+
+         Blocks=[Block(nhidden,inpsize,nheads,dropout_rate) for _ in range(nlayers)]
+
+         self.layers=nn.ModuleList(Blocks)
+
+         #output of last layer is normalized 
+
+         self.last_norm=nn.LayerNorm(nhidden,eps=1e-6)
+         self.shape_matcher=nn.Linear(inpsize,nhidden)
+    
+    def forward(self,inputs,ALIBI=False,mask=None,scalarproduct='standard'):
+        
+        outputs=self.shape_matcher(inputs)
+        
+
+        for layer in self.layers:
+            outputs=layer(outputs,ALIBI,mask,scalarproduct)
+        
+        outputs=self.last_norm(outputs)
+        return outputs
+ 
 
